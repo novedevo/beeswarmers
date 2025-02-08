@@ -168,24 +168,29 @@ mod tests {
     use super::*;
     const POINT_RADIUS_BEES: f64 = 1.0 / 20.0;
 
-    fn generate_random_sorted() -> Vec<f64> {
+    fn generate_random(n: usize) -> Vec<f64> {
         let rng = rand::rng();
         let normal = rand_distr::Normal::new(0.0, 0.4).unwrap();
-        let mut points = normal
+        let points = normal
             .sample_iter(rng.clone())
-            .take(100)
+            .take(n)
             .collect::<Vec<f64>>();
 
-        points.sort_by(|a, b| a.partial_cmp(b).unwrap());
         points
     }
 
+    fn sort(points: &mut [f64]) {
+        points.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    }
+
     fn get_biggest_difference(n: usize) -> (Vec<f64>, Vec<f64>, f64, f64) {
+        let random_numbers = generate_random(100 * (n + 1));
         let rayon_iter = (0..n).into_par_iter().map(|_| {
-            let points = generate_random_sorted();
+            let points = &mut random_numbers[n * 100..(n + 1) * 100].to_vec();
+            sort(points);
             let mirrored_points = mirror_points(&points);
 
-            let bees: Vec<[f64; 2]> = beeswarm_greedy(points.as_slice(), POINT_RADIUS_BEES);
+            let bees: Vec<[f64; 2]> = beeswarm_greedy(points, POINT_RADIUS_BEES);
             let seeb: Vec<[f64; 2]> = beeswarm_greedy(&mirrored_points, POINT_RADIUS_BEES);
 
             let bees = distances_from_centre(&bees);
@@ -193,7 +198,7 @@ mod tests {
             let max_distance = (bees.0 - seeb.0).abs();
             let rms_distance = (bees.1 - seeb.1).abs();
 
-            (max_distance, rms_distance, points)
+            (max_distance, rms_distance, n)
         });
 
         let max_outlier = rayon_iter
@@ -201,11 +206,15 @@ mod tests {
             .max_by(|t1, t2| t1.0.partial_cmp(&t2.0).unwrap())
             .unwrap();
         let rms_outlier = rayon_iter
-            .clone()
             .max_by(|t1, t2| t1.1.partial_cmp(&t2.1).unwrap())
             .unwrap();
 
-        (max_outlier.2, rms_outlier.2, max_outlier.0, rms_outlier.1)
+        (
+            vec![],
+            vec![],
+            max_outlier.0,
+            rms_outlier.1,
+        )
     }
 
     fn mirror_points(points: &[f64]) -> Vec<f64> {
