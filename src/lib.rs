@@ -184,9 +184,13 @@ mod tests {
     }
 
     fn get_biggest_difference(n: usize) -> (Vec<f64>, Vec<f64>, f64, f64) {
-        let random_numbers = generate_random(100 * (n + 1));
-        let rayon_iter = (0..n).into_par_iter().map(|_| {
-            let points = &mut random_numbers[n * 100..(n + 1) * 100].to_vec();
+        fn index_to_range(i: usize) -> Range<usize> {
+            i * 100..(i + 1) * 100
+        }
+
+        let random_numbers = generate_random(100 * n);
+        let rayon_iter = (0..n).into_par_iter().map(|i| {
+            let points = &mut random_numbers[index_to_range(i)].to_vec();
             sort(points);
             let mirrored_points = mirror_points(&points);
 
@@ -198,7 +202,7 @@ mod tests {
             let max_distance = (bees.0 - seeb.0).abs();
             let rms_distance = (bees.1 - seeb.1).abs();
 
-            (max_distance, rms_distance, n)
+            (max_distance, rms_distance, i)
         });
 
         let max_outlier = rayon_iter
@@ -209,9 +213,14 @@ mod tests {
             .max_by(|t1, t2| t1.1.partial_cmp(&t2.1).unwrap())
             .unwrap();
 
+        let mut max_outlier_vec = random_numbers[index_to_range(max_outlier.2)].to_vec();
+        sort(&mut max_outlier_vec);
+        let mut rms_outlier_vec = random_numbers[index_to_range(rms_outlier.2)].to_vec();
+        sort(&mut rms_outlier_vec);
+
         (
-            vec![],
-            vec![],
+            max_outlier_vec,
+            rms_outlier_vec,
             max_outlier.0,
             rms_outlier.1,
         )
